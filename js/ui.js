@@ -23,9 +23,9 @@ function dieEl(die, opts = {}) {
   el.className = 'die';
   el.dataset.id = die.id;
   const face = die.face;
-  el.style.background = FACE_HEX[face] || '#333';
+  if (face !== 'joker') el.style.background = FACE_HEX[face] || '#333'; // джокер — фон из CSS (звезда)
 
-  if (face === 'joker') { el.classList.add('joker'); el.textContent = '🃏'; }
+  if (face === 'joker') { el.classList.add('joker'); }
   else if (face === 'white') { el.classList.add('white'); }
   else if (face === 'hidden') { el.classList.add('hidden'); el.textContent = '?'; }
 
@@ -38,8 +38,6 @@ function dieEl(die, opts = {}) {
 
   if (opts.rerollSelected) el.classList.add('reroll-sel');
   if (opts.selected) el.classList.add('selected');
-  if (opts.comboOwner === mySeat) el.classList.add('combo-own');
-  else if (opts.comboOwner === other(mySeat)) el.classList.add('combo-opp');
   if (opts.clickable) el.classList.add('clickable');
   if (opts.onClick) el.addEventListener('click', opts.onClick);
   return el;
@@ -57,16 +55,27 @@ export function render(state) {
     selectedDieId = null;
   }
 
-  root.appendChild(statusBar(state));
-  root.appendChild(playerPanel(state, other(mySeat), true));
-  root.appendChild(boardEl(state));
-  root.appendChild(playerPanel(state, mySeat, false));
+  const layout = document.createElement('div');
+  layout.className = 'layout';
 
+  const left = document.createElement('div');
+  left.className = 'left';
+  left.appendChild(boardEl(state));
+
+  const right = document.createElement('div');
+  right.className = 'right';
+  right.appendChild(statusBar(state));
+  right.appendChild(playerPanel(state, other(mySeat), true));
+  right.appendChild(playerPanel(state, mySeat, false));
   if (state.phase === 'commonRoll' || state.phase === 'placeCommon') {
-    root.appendChild(commonPool(state));
+    right.appendChild(commonPool(state));
   }
-  root.appendChild(controls(state));
-  root.appendChild(instructions(state));
+  right.appendChild(controls(state));
+  right.appendChild(instructions(state));
+
+  layout.appendChild(left);
+  layout.appendChild(right);
+  root.appendChild(layout);
 }
 
 function statusBar(state) {
@@ -152,7 +161,11 @@ function boardEl(state) {
     const dieId = state.board[cell];
     const cellEl = document.createElement('div');
     cellEl.className = 'cell';
-    if (cellCombo[cell]) cellEl.classList.add('in-combo');
+    if (cellCombo[cell]) {
+      cellEl.classList.add('in-combo');
+      if (cellOwner[cell] === mySeat) cellEl.classList.add('combo-own');
+      else if (cellOwner[cell] === other(mySeat)) cellEl.classList.add('combo-opp');
+    }
 
     if (dieId === null) {
       const canPlace = (state.phase === 'placeCommon' || state.phase === 'placePersonal')
@@ -166,7 +179,7 @@ function boardEl(state) {
       }
     } else {
       const die = state.dice[dieId];
-      cellEl.appendChild(dieEl(die, { comboOwner: cellOwner[cell] }));
+      cellEl.appendChild(dieEl(die));
     }
     wrap.appendChild(cellEl);
   }
