@@ -1,7 +1,7 @@
 // Рендер и ввод. Рисует состояние с точки зрения mySeat.
 // Своё всегда синим, соперник — красным.
 
-import { FACE_HEX, FACE_LABEL_RU, BOARD_SIZE, CELLS, POINTS_BY_LENGTH } from './constants.js?v=6';
+import { FACE_HEX, FACE_LABEL_RU, BOARD_SIZE, CELLS, POINTS_BY_LENGTH } from './constants.js?v=7';
 
 const other = (s) => (s === 0 ? 1 : 0);
 
@@ -98,6 +98,7 @@ export function render(state) {
   }
   right.appendChild(controls(state));
   right.appendChild(instructions(state));
+  right.appendChild(historyPanel(state));
 
   layout.appendChild(left);
   layout.appendChild(right);
@@ -337,6 +338,76 @@ function instructions(state) {
   };
   d.textContent = map[state.phase] || '';
   return d;
+}
+
+// ---------- Панель истории ходов ----------
+
+function cellRC(cell) { return { r: Math.floor(cell / BOARD_SIZE) + 1, c: (cell % BOARD_SIZE) + 1 }; }
+function lineName(kind, index) { return kind === 'row' ? `ряд ${index + 1}` : `столбец ${index + 1}`; }
+
+function txt(s) { return document.createTextNode(s); }
+
+function playerSpan(seat) {
+  const s = document.createElement('span');
+  s.className = 'hname ' + (seat === mySeat ? 'mine' : 'opp');
+  s.textContent = seat === mySeat ? 'Вы' : 'Соперник';
+  return s;
+}
+
+function faceSwatch(face) {
+  const s = document.createElement('span');
+  s.className = 'swatch';
+  if (face === 'joker') { s.classList.add('joker'); s.textContent = '★'; }
+  else { s.style.background = FACE_HEX[face] || '#333'; if (face === 'white') s.classList.add('white'); }
+  return s;
+}
+
+function historyPanel(state) {
+  const wrap = document.createElement('details');
+  wrap.className = 'history';
+  wrap.open = true;
+  const sum = document.createElement('summary');
+  sum.textContent = 'История ходов';
+  wrap.appendChild(sum);
+
+  const list = document.createElement('div');
+  list.className = 'hist-list';
+  for (const e of state.log || []) {
+    const row = document.createElement('div');
+    if (e.type === 'round') {
+      row.className = 'hist-round';
+      row.textContent = `— Раунд ${e.round} —`;
+    } else if (e.type === 'place') {
+      row.className = 'hist-place';
+      const rc = cellRC(e.cell);
+      row.appendChild(playerSpan(e.seat));
+      row.appendChild(txt(' — '));
+      row.appendChild(faceSwatch(e.face));
+      const label = FACE_LABEL_RU[e.face] || e.face;
+      const kind = e.kind === 'personal' ? 'личный' : 'общий';
+      row.appendChild(txt(` ${kind} ${label} → ряд ${rc.r}, ст. ${rc.c}`));
+    } else if (e.type === 'combo') {
+      row.className = 'hist-combo';
+      const ln = lineName(e.kind, e.index);
+      if (e.change === 'gain') {
+        row.appendChild(txt(e.prevOwner == null ? '▶ ' : '↔ '));
+        row.appendChild(faceSwatch(e.color));
+        row.appendChild(txt(` ${ln} (${e.length}) `));
+        if (e.prevOwner == null) row.appendChild(txt('— '));
+        else row.appendChild(txt('перетянул(а) '));
+        row.appendChild(playerSpan(e.owner));
+      } else {
+        row.className += ' off';
+        row.appendChild(txt('✖ '));
+        row.appendChild(faceSwatch(e.color));
+        row.appendChild(txt(` ${ln} ${e.change === 'off' ? 'отключилась' : 'распалась'}`));
+      }
+    }
+    list.appendChild(row);
+  }
+  wrap.appendChild(list);
+  setTimeout(() => { list.scrollTop = list.scrollHeight; }, 0);
+  return wrap;
 }
 
 // баннер «первый игрок» показываем поверх

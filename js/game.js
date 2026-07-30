@@ -5,7 +5,7 @@ import {
   COLORS, PERSONAL_FACES, COMMON_FACES, BOARD_SIZE, CELLS,
   PERSONAL_PER_PLAYER, COMMON_COUNT, COMMON_REROLL_MAX,
   TOTAL_ROUNDS, POINTS_BY_LENGTH,
-} from './constants.js?v=6';
+} from './constants.js?v=7';
 
 const other = (seat) => (seat === 0 ? 1 : 0);
 
@@ -47,6 +47,7 @@ export function createGame() {
     roundScores: [],                    // [{0,1}, ...]
     totalScores: { 0: 0, 1: 0 },
     combos: [],                         // результат последнего подсчёта (для подсветки)
+    log: [],                            // история ходов и изменений комбинаций
 
     banner: '',                         // короткое сообщение для UI
   };
@@ -75,6 +76,7 @@ function setupRound(state) {
   state.combos = [];
   state.phase = 'personalRoll';
   state.roundJustStarted = true;
+  state.log.push({ type: 'round', round: state.round });
 
   // Личные кости обоих игроков: сразу кидаем.
   for (const seat of [0, 1]) {
@@ -167,10 +169,17 @@ const handlers = {
       state.placedOrder[dieId] = ++state.placeSeq;
     }
 
+    const personal = state.phase === 'placePersonal';
+    const prevMap = personal ? lineOwners(state.combos) : null;
+
     die.cell = cell;
     state.board[cell] = dieId;
+    state.log.push({ type: 'place', round: state.round, seat, face: die.face, kind: die.kind, cell });
 
-    if (state.phase === 'placePersonal') state.combos = computeCombos(state);
+    if (personal) {
+      state.combos = computeCombos(state);
+      logCombosDiff(state, prevMap, lineOwners(state.combos));
+    }
 
     if (allPlaced(state, state.phase === 'placeCommon' ? 'common' : 'personal')) {
       if (state.phase === 'placeCommon') startPlacePersonal(state);
@@ -305,8 +314,16 @@ function findRunsInLine(state, cells) {
 
 export function computeCombos(state) {
   const runs = [];
-  for (let r = 0; r < BOARD_SIZE; r++) runs.push(...findRunsInLine(state, lineCells(r, true)));
-  for (let c = 0; c < BOARD_SIZE; c++) runs.push(...findRunsInLine(state, lineCells(c, false)));
+  for (let r = 0; r < BOARD_SIZE; r++) {
+    const rs = findRunsInLine(state, lineCells(r, true));
+    for (const x of rs) x.line = { kind: 'row', index: r };
+    runs.push(...rs);
+  }
+  for (let c = 0; c < BOARD_SIZE; c++) {
+    const cs = findRunsInLine(state, lineCells(c, false));
+    for (const x of cs) x.line = { kind: 'col', index: c };
+    runs.push(...cs);
+  }
 
   const seatOf = (id) => state.dice[id].seat;
   const orderOf = (id) => state.placedOrder[id] ?? -1;
@@ -343,6 +360,43 @@ export function computeCombos(state) {
     if (!changed) break;
   }
   return runs;
+}
+
+// ---------- История: изменения комбинаций ----------
+// В строке/столбце может быть максимум одна комбинация (длина линии 5),
+// поэтому владельцев удобно хранить по ключу линии.
+function lineOwners(combos) {
+  const m = {};
+  for (const run of combos || []) {
+    if (!run.line) continue;
+    m[run.line.kind + '-' + run.line.index] = {
+      owner: run.owner ?? null, color: run.color, length: run.length,
+      kind: run.line.kind, index: run.line.index,
+    };
+  }
+  return m;
+}
+
+function logCombosDiff(state, prevMap, newMap) {
+  const keys = new Set([...Object.keys(prevMap), ...Object.keys(newMap)]);
+  for (const k of keys) {
+    const a = prevMap[k];
+    const b = newMap[k];
+    if (b && b.owner != null && (!a || a.owner !== b.owner)) {
+      // комбинация стала чьей-то (собрана, активирована или перетянута)
+      state.log.push({
+        type: 'combo', change: 'gain', kind: b.kind, index: b.index,
+        color: b.color, length: b.length, owner: b.owner,
+        prevOwner: a && a.owner != null ? a.owner : null,
+      });
+    } else if ((!b || b.owner == null) && a && a.owner != null) {
+      // была чьей-то, теперь погасла (отключена) или распалась
+      state.log.push({
+        type: 'combo', change: b ? 'off' : 'broke', kind: a.kind, index: a.index,
+        color: a.color, length: a.length, prevOwner: a.owner,
+      });
+    }
+  }
 }
 
 // ---------- Вид для конкретного места (скрываем чужие невыложенные личные) ----------
