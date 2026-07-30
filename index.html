@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dice Arena — кооп на двоих</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
+</head>
+<body>
+  <header class="topbar">
+    <h1>🎲 Dice Arena</h1>
+    <span class="subtitle">кооп на двоих · поле 5×5</span>
+  </header>
+
+  <!-- Лобби -->
+  <main id="lobby">
+    <div class="lobby-card">
+      <p class="lobby-intro">Создайте комнату и передайте код другу — или введите код, чтобы присоединиться.</p>
+      <div class="lobby-buttons">
+        <button id="btn-create" class="btn primary big">Создать комнату</button>
+        <button id="btn-join" class="btn secondary big">Присоединиться</button>
+      </div>
+
+      <div id="create-panel" class="lobby-panel hidden">
+        <div id="host-status" class="host-status"></div>
+      </div>
+
+      <div id="join-panel" class="lobby-panel hidden">
+        <label for="join-code">Код комнаты</label>
+        <input id="join-code" type="text" autocomplete="off" maxlength="8" placeholder="напр. K7QMP">
+        <button id="btn-join-go" class="btn primary">Войти</button>
+        <div id="join-status" class="muted"></div>
+      </div>
+
+      <details class="rules">
+        <summary>Как играть</summary>
+        <ol>
+          <li>Каждый втайне кидает 4 личные кости, можно один раз перебросить любые.</li>
+          <li>Определяется первый игрок. Кидаются 14 общих костей — первый, затем второй игрок могут перебросить до 7 штук.</li>
+          <li>По очереди (начинает второй) выставляете общие кости на поле.</li>
+          <li>Затем по очереди (начинает первый) выставляете личные кости.</li>
+          <li>3+ одного цвета подряд в ряду/столбце = комбинация. Она ваша, если вы последним поставили туда свою личную кость. Джокер — любой цвет, белый — никакой.</li>
+          <li>Очки: 3 = 1, 4 = 2, 5 = 4. Три раунда, затем итог.</li>
+        </ol>
+      </details>
+    </div>
+  </main>
+
+  <!-- Игра -->
+  <main id="game" class="hidden">
+    <div id="game-content"></div>
+  </main>
+
+  <footer class="footer">свои комбинации — синие, соперника — красные</footer>
+
+  <!-- PeerJS (публичный брокер, без своего сервера) -->
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

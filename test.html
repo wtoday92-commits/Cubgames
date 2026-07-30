@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><title>tests</title>
+<style>body{font-family:monospace;background:#111;color:#ddd;padding:20px}.pass{color:#4c4}.fail{color:#f55;font-weight:bold}</style>
+</head><body><h1>Dice Arena — тесты логики</h1><pre id="out"></pre>
+<script type="module">
+import { computeCombos, createGame, apply, other } from './js/game.js';
+
+const out = document.getElementById('out');
+let pass = 0, fail = 0;
+function log(ok, msg) {
+  out.innerHTML += `<span class="${ok ? 'pass' : 'fail'}">${ok ? 'PASS' : 'FAIL'}</span> ${msg}\n`;
+  ok ? pass++ : fail++;
+}
+function eq(a, b, msg) { log(a === b, `${msg} (got ${a}, want ${b})`); }
+
+const CM = { y: 'yellow', g: 'green', b: 'blue', r: 'red', p: 'purple' };
+const KM = { Y: 'yellow', G: 'green', B: 'blue', R: 'red', P: 'purple', W: 'white' };
+
+function S(rows, orderCells) {
+  const dice = {}, board = new Array(25).fill(null);
+  const personal = { 0: [], 1: [] }, common = [];
+  let n = 0;
+  rows.forEach((row, ri) => row.trim().split(/\s+/).forEach((tk, ci) => {
+    const cell = ri * 5 + ci;
+    if (tk === '.') return;
+    let die;
+    if (/^[ygbrp][01]$/.test(tk)) { die = { id: 'd' + n++, kind: 'personal', seat: +tk[1], face: CM[tk[0]], cell }; personal[die.seat].push(die.id); }
+    else if (/^j[01]$/.test(tk)) { die = { id: 'd' + n++, kind: 'personal', seat: +tk[1], face: 'joker', cell }; personal[die.seat].push(die.id); }
+    else if (/^[YGBRPW]$/.test(tk)) { die = { id: 'd' + n++, kind: 'common', seat: null, face: KM[tk], cell }; common.push(die.id); }
+    else throw 'bad ' + tk;
+    dice[die.id] = die; board[cell] = die.id;
+  }));
+  const placedOrder = {}; let seq = 0;
+  if (orderCells) for (const c of orderCells) placedOrder[board[c]] = ++seq;
+  for (const s of [0, 1]) for (const id of personal[s]) if (!(id in placedOrder)) placedOrder[id] = ++seq;
+  return { board, dice, personal, common, placedOrder };
+}
+const E = '. . . . .';
+
+// A. простой ряд из 3 красных seat0
+{
+  const c = computeCombos(S(['r0 r0 r0 . .', E, E, E, E]));
+  eq(c.length, 1, 'A: одна комбинация');
+  eq(c[0] && c[0].length, 3, 'A: длина 3');
+  eq(c[0] && c[0].owner, 0, 'A: владелец seat0');
+}
+// B. кража ряда: seat1 ставит последним
+{
+  const c = computeCombos(S(['r0 r0 r1 . .', E, E, E, E], [0, 1, 2]));
+  eq(c.length, 1, 'B: одна комбинация');
+  eq(c[0].owner, 1, 'B: владелец seat1 (поставил последним)');
+}
+// C. джокер соединяет цвет
+{
+  const c = computeCombos(S(['r0 j0 r0 . .', E, E, E, E]));
+  eq(c.length, 1, 'C: джокер соединяет');
+  eq(c[0].owner, 0, 'C: владелец seat0');
+}
+// D. белый разрывает
+{
+  const c = computeCombos(S(['r0 W r0 . .', E, E, E, E]));
+  eq(c.length, 0, 'D: белый разрывает — нет комбинации');
+}
+// E. три джокера = комбинация
+{
+  const c = computeCombos(S(['j0 j0 j0 . .', E, E, E, E]));
+  eq(c.length, 1, 'E: три джокера — комбинация');
+  eq(c[0].owner, 0, 'E: владелец seat0');
+}
+// F. отключение второй комбинации (D — единственный якорь столбца)
+{
+  const st = S(['r0 R R r1 .', 'R . . . .', 'R . . . .', E, E], [0, 3]);
+  const c = computeCombos(st);
+  const row = c.find(x => x.cells.includes(0) && x.cells.includes(3)); // ряд длины 4
+  const col = c.find(x => x.cells.includes(0) && x.cells.includes(5)); // столбец col0
+  eq(row && row.owner, 1, 'F: ряд украл seat1');
+  eq(col && col.owner, null, 'F: столбец отключён (единственный якорь захвачен)');
+}
+// G. реактивация: seat0 возвращает ряд — столбец снова его
+{
+  const st = S(['r0 R R r1 r0', 'R . . . .', 'R . . . .', E, E], [0, 3, 4]);
+  const c = computeCombos(st);
+  const row = c.find(x => x.cells.includes(0) && x.cells.includes(4));
+  const col = c.find(x => x.cells.includes(0) && x.cells.includes(5));
+  eq(row && row.owner, 0, 'G: ряд снова seat0');
+  eq(col && col.owner, 0, 'G: столбец реактивирован для seat0');
+}
+// H. длина 5 = 4 очка (проверим длину и владельца)
+{
+  const c = computeCombos(S(['b0 B B B b0 '.trim(), E, E, E, E].map(s=>s), undefined));
+  // строка: b0 B B B b0 -> синий длина 5
+  eq(c.length, 1, 'H: одна комбинация длины 5');
+  eq(c[0].length, 5, 'H: длина 5');
+}
+
+// I. полный прогон 3 раундов через apply() без исключений
+try {
+  const g = createGame();
+  const firstEmpty = () => g.board.indexOf(null);
+  let guard = 0;
+  while (g.phase !== 'gameover' && guard++ < 5000) {
+    const ph = g.phase;
+    if (ph === 'personalRoll') {
+      if (!g.readyPersonal[0]) apply(g, { type: 'ready' }, 0);
+      else apply(g, { type: 'ready' }, 1);
+    } else if (ph === 'commonRoll') {
+      apply(g, { type: 'ready' }, g.commonTurn);
+    } else if (ph === 'placeCommon') {
+      const seat = g.turn;
+      const die = g.common.map(id => g.dice[id]).find(d => d.cell === null);
+      apply(g, { type: 'placeDie', dieId: die.id, cell: firstEmpty() }, seat);
+    } else if (ph === 'placePersonal') {
+      const seat = g.turn;
+      const die = g.personal[seat].map(id => g.dice[id]).find(d => d.cell === null);
+      apply(g, { type: 'placeDie', dieId: die.id, cell: firstEmpty() }, seat);
+    } else if (ph === 'scoring') {
+      apply(g, { type: 'nextRound' }, 0);
+    }
+  }
+  eq(g.phase, 'gameover', 'I: игра дошла до конца');
+  eq(g.roundScores.length, 3, 'I: сыграно 3 раунда');
+  const sum = g.roundScores.reduce((a, r) => ({ 0: a[0] + r[0], 1: a[1] + r[1] }), { 0: 0, 1: 0 });
+  eq(sum[0], g.totalScores[0], 'I: сумма очков seat0 сходится');
+  eq(sum[1], g.totalScores[1], 'I: сумма очков seat1 сходится');
+  log(guard < 5000, 'I: без зацикливания');
+} catch (e) {
+  log(false, 'I: исключение — ' + e.message + '\n' + e.stack);
+}
+
+out.innerHTML += `\n<b>Итог: ${pass} прошло, ${fail} упало</b>\n`;
+document.title = fail ? `FAIL ${fail}` : `OK ${pass}`;
+</script></body></html>

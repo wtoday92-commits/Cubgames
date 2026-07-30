@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><title>uitests</title>
+<link rel="stylesheet" href="css/styles.css">
+<style>#log{font-family:monospace;padding:10px}.pass{color:#4c4}.fail{color:#f55;font-weight:bold}</style>
+</head><body>
+<div id="log"></div>
+<div id="game"><div id="game-content"></div></div>
+<script type="module">
+import { createGame, apply, viewFor } from './js/game.js';
+import * as ui from './js/ui.js';
+
+const log = document.getElementById('log');
+let pass = 0, fail = 0;
+function ok(cond, msg){ log.innerHTML += `<div class="${cond?'pass':'fail'}">${cond?'PASS':'FAIL'} ${msg}</div>`; cond?pass++:fail++; }
+
+ui.initUI(() => {}); // клики никуда не шлём
+
+// Рендерим оба вида (seat0 и seat1) на каждом шаге прогона, ловим исключения.
+function renderBoth(g, phaseLabel){
+  for (const seat of [0,1]) {
+    try {
+      ui.setSeat(seat);
+      ui.render(viewFor(g, seat));
+      const cells = document.querySelectorAll('#game-content .cell').length;
+      if (cells !== 25) throw new Error('клеток '+cells);
+    } catch(e){ ok(false, `${phaseLabel} seat${seat}: ${e.message}`); return false; }
+  }
+  return true;
+}
+
+try {
+  const g = createGame();
+  const firstEmpty = () => g.board.indexOf(null);
+  const seen = new Set();
+  let guard = 0, allOk = true;
+  while (g.phase !== 'gameover' && guard++ < 5000) {
+    if (!seen.has(g.phase)) { seen.add(g.phase); allOk = renderBoth(g, g.phase) && allOk; }
+    else renderBoth(g, g.phase);
+    const ph = g.phase;
+    if (ph === 'personalRoll') { if(!g.readyPersonal[0]) apply(g,{type:'ready'},0); else apply(g,{type:'ready'},1); }
+    else if (ph === 'commonRoll') apply(g,{type:'ready'},g.commonTurn);
+    else if (ph === 'placeCommon') { const d=g.common.map(i=>g.dice[i]).find(x=>x.cell===null); apply(g,{type:'placeDie',dieId:d.id,cell:firstEmpty()},g.turn); }
+    else if (ph === 'placePersonal') { const d=g.personal[g.turn].map(i=>g.dice[i]).find(x=>x.cell===null); apply(g,{type:'placeDie',dieId:d.id,cell:firstEmpty()},g.turn); }
+    else if (ph === 'scoring') apply(g,{type:'nextRound'},0);
+  }
+  renderBoth(g, 'gameover');
+  ok(allOk, 'все фазы отрисованы без исключений');
+  ok(seen.has('placePersonal'), 'фаза placePersonal встретилась');
+  ok(g.phase === 'gameover', 'дошли до gameover');
+  ok(pass>0 && fail===0, 'нет падений');
+} catch(e){ ok(false, 'исключение: '+e.message+' '+e.stack); }
+
+log.innerHTML += `<div><b>Итог: ${pass} прошло, ${fail} упало</b></div>`;
+document.title = fail ? `FAIL ${fail}` : `OK ${pass}`;
+</script></body></html>
