@@ -60,8 +60,12 @@ function startAsHost() {
   net.on('data', (msg) => {
     if (msg.t === 'action') { apply(game, msg.action, 1); afterHostChange(); }
   });
+  net.on('status', (s) => {
+    const el = $('host-status').querySelector('.muted');
+    if (el) el.textContent = s;
+  });
   net.on('closed', () => ui.toast('Соперник отключился'));
-  net.on('error', (e) => ui.toast('Ошибка сети: ' + (e?.type || e?.message || e)));
+  net.on('error', (e) => ui.toast('Ошибка сети: ' + (e?.message || e?.type || e)));
   net.host();
 }
 
@@ -71,6 +75,7 @@ function startAsGuest(code) {
   ui.setSeat(1);
   ui.initUI((action) => net.send({ t: 'action', action }));
 
+  net.on('status', (s) => { $('join-status').textContent = s; });
   net.on('connected', () => { showGame(); ui.toast('Подключено'); });
   net.on('data', (msg) => {
     if (msg.t === 'state') {
@@ -80,7 +85,12 @@ function startAsGuest(code) {
     }
   });
   net.on('closed', () => ui.toast('Хост отключился'));
-  net.on('error', (e) => ui.toast('Не удалось подключиться: ' + (e?.type || e?.message || e)));
+  net.on('error', (e) => {
+    const m = e?.message || e?.type || e;
+    $('join-status').innerHTML = `<span style="color:#f55">${m}</span><br>` +
+      `<span class="muted">Обновите страницу и попробуйте снова.</span>`;
+    ui.toast('' + m);
+  });
   net.join(code);
 }
 
