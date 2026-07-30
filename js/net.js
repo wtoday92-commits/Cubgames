@@ -20,6 +20,20 @@ const CONNECT_TIMEOUT_MS = 22000;
 //  После вписывания ключа поднимите версию ?v= в index.html и js/*.js,
 //  затем git push, и обоим обновить страницу.
 // ============================================================================
+// --- Способ A (проще): вставьте сюда массив из кнопки "Show ICE Servers Array".
+//     Пример того, что даёт Metered:
+//       { urls: "stun:stun.relay.metered.ca:80" },
+//       { urls: "turn:global.relay.metered.ca:80", username: "...", credential: "..." },
+//       ... (ещё несколько строк)
+const MY_ICE_SERVERS = [
+  { urls: 'stun:stun.relay.metered.ca:80' },
+  { urls: 'turn:global.relay.metered.ca:80', username: '6d470c3c9a8d4b92fe233463', credential: 'SFH+k86OX5WG6MeU' },
+  { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: '6d470c3c9a8d4b92fe233463', credential: 'SFH+k86OX5WG6MeU' },
+  { urls: 'turn:global.relay.metered.ca:443', username: '6d470c3c9a8d4b92fe233463', credential: 'SFH+k86OX5WG6MeU' },
+  { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: '6d470c3c9a8d4b92fe233463', credential: 'SFH+k86OX5WG6MeU' },
+];
+
+// --- Способ B (альтернатива): API-ключ + имя приложения (кнопка "Show API Key").
 const METERED_APP = '';      // например: 'dicearena'
 const METERED_API_KEY = '';  // например: 'a1b2c3d4e5...'
 
@@ -34,13 +48,17 @@ const FALLBACK_ICE = [
   { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
 ];
 
-export const USING_CUSTOM_TURN = !!(METERED_APP && METERED_API_KEY);
+export const USING_CUSTOM_TURN = MY_ICE_SERVERS.length > 0 || !!(METERED_APP && METERED_API_KEY);
 
-// ICE-серверы загружаем один раз. С ключом — свежие доступы из Metered.
+// ICE-серверы загружаем один раз.
 let _icePromise = null;
 function loadIce() {
   if (_icePromise) return _icePromise;
-  if (USING_CUSTOM_TURN) {
+  if (MY_ICE_SERVERS.length > 0) {
+    // Способ A: готовый массив вставлен вручную.
+    const hasStun = MY_ICE_SERVERS.some((s) => String(s.urls).startsWith('stun:'));
+    _icePromise = Promise.resolve(hasStun ? MY_ICE_SERVERS : [STUN, ...MY_ICE_SERVERS]);
+  } else if (METERED_APP && METERED_API_KEY) {
     const url = `https://${METERED_APP}.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(METERED_API_KEY)}`;
     _icePromise = fetch(url)
       .then((r) => { if (!r.ok) throw new Error('TURN HTTP ' + r.status); return r.json(); })

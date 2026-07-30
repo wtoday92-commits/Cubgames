@@ -1,7 +1,7 @@
 // Рендер и ввод. Рисует состояние с точки зрения mySeat.
 // Своё всегда синим, соперник — красным.
 
-import { FACE_HEX, FACE_LABEL_RU, BOARD_SIZE, CELLS, POINTS_BY_LENGTH } from './constants.js?v=4';
+import { FACE_HEX, FACE_LABEL_RU, BOARD_SIZE, CELLS, POINTS_BY_LENGTH } from './constants.js?v=5';
 
 const other = (s) => (s === 0 ? 1 : 0);
 
