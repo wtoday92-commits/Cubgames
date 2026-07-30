@@ -109,6 +109,41 @@ const E = '. . . . .';
   eq(row5 && row5.owner, 1, 'J2: ряд соперника остался его (seat1)');
 }
 
+// J3. личный фиолетовый замыкает столбец через двух джокеров соперника
+{
+  const st = S([
+    '. . . . .',
+    '. . . . p0',
+    'Y Y y0 Y j1',
+    '. . . . P',
+    'P P P P j1',
+  ], [12, 14, 24, 9]);
+  const c = computeCombos(st);
+  const col = c.find(x => x.cells.includes(9) && x.cells.includes(14) && x.cells.includes(24));
+  const row3 = c.find(x => x.cells.includes(10) && x.cells.includes(14));
+  const row5 = c.find(x => x.cells.includes(20) && x.cells.includes(24));
+  eq(col && col.owner, 0, 'J3: столбец мой (личный фиолетовый — последний)');
+  eq(row3 && row3.owner, 0, 'J3: ряд3 стал мой (джокер соперника отключён, работает мой жёлтый)');
+  eq(row5 && row5.owner, null, 'J3: ряд5 ПОГАС (моих кубиков там нет) — не мой и не соперника');
+}
+// J4. изолированный синий (без комбинации) НЕ меняет владельцев
+{
+  const st = S([
+    'B . . . .',
+    '. . . . p0',
+    'Y Y y0 Y j1',
+    '. . . . P',
+    'P P P P j1',
+  ], [12, 14, 24, 9]);
+  const c = computeCombos(st);
+  const col = c.find(x => x.cells.includes(9) && x.cells.includes(14) && x.cells.includes(24));
+  const row3 = c.find(x => x.cells.includes(10) && x.cells.includes(14));
+  const row5 = c.find(x => x.cells.includes(20) && x.cells.includes(24));
+  eq(col && col.owner, 0, 'J4: столбец всё ещё мой');
+  eq(row3 && row3.owner, 0, 'J4: ряд3 всё ещё мой');
+  eq(row5 && row5.owner, null, 'J4: ряд5 всё ещё погашен');
+}
+
 // I. полный прогон 3 раундов через apply() без исключений
 try {
   const g = createGame();
