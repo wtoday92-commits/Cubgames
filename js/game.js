@@ -5,7 +5,7 @@ import {
   COLORS, PERSONAL_FACES, COMMON_FACES, BOARD_SIZE, CELLS,
   PERSONAL_PER_PLAYER, COMMON_COUNT, COMMON_REROLL_MAX,
   TOTAL_ROUNDS, POINTS_BY_LENGTH,
-} from './constants.js?v=5';
+} from './constants.js?v=6';
 
 const other = (seat) => (seat === 0 ? 1 : 0);
 

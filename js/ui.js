@@ -1,7 +1,7 @@
 // Рендер и ввод. Рисует состояние с точки зрения mySeat.
 // Своё всегда синим, соперник — красным.
 
-import { FACE_HEX, FACE_LABEL_RU, BOARD_SIZE, CELLS, POINTS_BY_LENGTH } from './constants.js?v=5';
+import { FACE_HEX, FACE_LABEL_RU, BOARD_SIZE, CELLS, POINTS_BY_LENGTH } from './constants.js?v=6';
 
 const other = (s) => (s === 0 ? 1 : 0);
 
@@ -10,8 +10,34 @@ let mySeat = 0;
 let selectedDieId = null; // локальный выбор кости для расстановки
 let lastState = null;
 
+let _dbgBound = false;
 export function initUI(dispatchFn) {
   dispatch = dispatchFn;
+  if (!_dbgBound) {
+    _dbgBound = true;
+    // Ctrl+Shift+D — снять слепок состояния (для отладки подсчёта очков).
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.code === 'KeyD')) {
+        e.preventDefault();
+        dumpState();
+      }
+    });
+  }
+}
+
+function dumpState() {
+  if (!lastState) { toast('Нет состояния'); return; }
+  const txt = JSON.stringify({ mySeat, state: lastState });
+  console.log('DICE_STATE_DUMP', txt);
+  const done = () => toast('Слепок состояния скопирован — вставьте его в чат');
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = txt; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (_) {}
+    ta.remove(); toast('Слепок в консоли (F12 → Console)');
+  };
+  if (navigator.clipboard) navigator.clipboard.writeText(txt).then(done, fallback);
+  else fallback();
 }
 
 export function setSeat(seat) { mySeat = seat; }

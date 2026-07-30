@@ -1,9 +1,9 @@
 // Точка входа: лобби, соединение, связка сети и игры.
 // Хост авторитетен (seat 0), гость (seat 1) только рисует и шлёт действия.
 
-import { createGame, apply, viewFor } from './game.js?v=5';
-import { Net } from './net.js?v=5';
-import * as ui from './ui.js?v=5';
+import { createGame, apply, viewFor } from './game.js?v=6';
+import { Net } from './net.js?v=6';
+import * as ui from './ui.js?v=6';
 
 const net = new Net();
 let role = null;       // 'host' | 'guest'

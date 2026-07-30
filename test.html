@@ -93,6 +93,22 @@ const E = '. . . . .';
   eq(c[0].length, 5, 'H: длина 5');
 }
 
+// J1. личный джокер замыкает красный столбец (общие красные) -> столбец мой
+{
+  const c = computeCombos(S([E, E, '. . R . .', '. . j0 . .', '. . R . .'], [17]));
+  const col = c.find(x => x.cells.includes(12) && x.cells.includes(22));
+  eq(col && col.length, 3, 'J1: столбец длины 3');
+  eq(col && col.owner, 0, 'J1: джокер сделал столбец моим (seat0)');
+}
+// J2. нижняя красная общая с комбинацией соперника в ряду; джокер ставится последним
+{
+  const c = computeCombos(S([E, E, '. . R . .', '. . j0 . .', '. . r1 r1 r1'], [22, 23, 24, 17]));
+  const col = c.find(x => x.cells.includes(12) && x.cells.includes(17) && x.cells.includes(22));
+  const row5 = c.find(x => x.cells.includes(22) && x.cells.includes(24) && x.cells.length === 3 && !x.cells.includes(12));
+  eq(col && col.owner, 0, 'J2: столбец забрал я джокером (seat0)');
+  eq(row5 && row5.owner, 1, 'J2: ряд соперника остался его (seat1)');
+}
+
 // I. полный прогон 3 раундов через apply() без исключений
 try {
   const g = createGame();
