@@ -6,15 +6,42 @@ const PREFIX = 'dicearena-v1-';
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // без похожих символов
 const CONNECT_TIMEOUT_MS = 22000;
 
-// STUN + публичные TURN. TURN нужен, чтобы пробивать домашние/мобильные NAT,
-// иначе соединение может "висеть" бесконечно.
-const ICE_SERVERS = [
+// ============================================================================
+//  ВАШ TURN-СЕРВЕР  (нужен, чтобы пробивать домашние/мобильные NAT).
+//  Бесплатные публичные TURN нестабильны, поэтому лучше вставить свой ключ.
+//
+//  Как получить бесплатно (50 ГБ/мес, хватает с головой):
+//    1. Зарегистрируйтесь на https://dashboard.metered.ca (Open Relay).
+//    2. Слева "TURN Server" → там будет готовый JS-массив iceServers
+//       (stun: ... и несколько turn: ... с вашими username/credential).
+//    3. Скопируйте ВЕСЬ этот массив и вставьте внутрь MY_TURN ниже.
+//
+//  Пока MY_TURN пуст — используется публичный запасной вариант (может не
+//  работать). После вставки ключа не забудьте поднять версию ?v= в index.html
+//  и js/*.js, затем git push, и обоим обновить страницу.
+// ============================================================================
+const MY_TURN = [
+  // сюда вставьте массив iceServers из Metered, например:
+  // { urls: 'stun:stun.relay.metered.ca:80' },
+  // { urls: 'turn:global.relay.metered.ca:80', username: 'ВАШ_USERNAME', credential: 'ВАШ_CREDENTIAL' },
+  // { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: 'ВАШ_USERNAME', credential: 'ВАШ_CREDENTIAL' },
+  // { urls: 'turn:global.relay.metered.ca:443', username: 'ВАШ_USERNAME', credential: 'ВАШ_CREDENTIAL' },
+  // { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: 'ВАШ_USERNAME', credential: 'ВАШ_CREDENTIAL' },
+];
+
+const FALLBACK_ICE = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:global.stun.twilio.com:3478' },
   { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
 ];
+
+const ICE_SERVERS = MY_TURN.length
+  ? [{ urls: 'stun:stun.l.google.com:19302' }, ...MY_TURN]
+  : FALLBACK_ICE;
+
+export const USING_CUSTOM_TURN = MY_TURN.length > 0;
 
 const PEER_OPTS = { debug: 1, config: { iceServers: ICE_SERVERS } };
 
