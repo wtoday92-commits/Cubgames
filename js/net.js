@@ -8,42 +8,49 @@ const CONNECT_TIMEOUT_MS = 22000;
 
 // ============================================================================
 //  ВАШ TURN-СЕРВЕР  (нужен, чтобы пробивать домашние/мобильные NAT).
-//  Бесплатные публичные TURN нестабильны, поэтому лучше вставить свой ключ.
+//  Metered даёт API-ключ и адрес приложения <app>.metered.live, а список
+//  серверов программа сама запрашивает по ключу. Достаточно вписать 2 строки:
 //
-//  Как получить бесплатно (50 ГБ/мес, хватает с головой):
-//    1. Зарегистрируйтесь на https://dashboard.metered.ca (Open Relay).
-//    2. Слева "TURN Server" → там будет готовый JS-массив iceServers
-//       (stun: ... и несколько turn: ... с вашими username/credential).
-//    3. Скопируйте ВЕСЬ этот массив и вставьте внутрь MY_TURN ниже.
+//    1. Зарегистрируйтесь на https://dashboard.metered.ca
+//    2. Создайте приложение — его имя (поддомен вида  МОЁ-ИМЯ .metered.live)
+//       впишите в METERED_APP  (без ".metered.live").
+//    3. Найдите API Key (Secret Key) приложения и впишите в METERED_API_KEY.
 //
-//  Пока MY_TURN пуст — используется публичный запасной вариант (может не
-//  работать). После вставки ключа не забудьте поднять версию ?v= в index.html
-//  и js/*.js, затем git push, и обоим обновить страницу.
+//  Пока поля пустые — используется публичный запасной TURN (часто не работает).
+//  После вписывания ключа поднимите версию ?v= в index.html и js/*.js,
+//  затем git push, и обоим обновить страницу.
 // ============================================================================
-const MY_TURN = [
-  // сюда вставьте массив iceServers из Metered, например:
-  // { urls: 'stun:stun.relay.metered.ca:80' },
-  // { urls: 'turn:global.relay.metered.ca:80', username: 'ВАШ_USERNAME', credential: 'ВАШ_CREDENTIAL' },
-  // { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: 'ВАШ_USERNAME', credential: 'ВАШ_CREDENTIAL' },
-  // { urls: 'turn:global.relay.metered.ca:443', username: 'ВАШ_USERNAME', credential: 'ВАШ_CREDENTIAL' },
-  // { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: 'ВАШ_USERNAME', credential: 'ВАШ_CREDENTIAL' },
-];
+const METERED_APP = '';      // например: 'dicearena'
+const METERED_API_KEY = '';  // например: 'a1b2c3d4e5...'
 
+const STUN = { urls: 'stun:stun.l.google.com:19302' };
+
+// Запасной публичный вариант (нестабилен — работает не всегда).
 const FALLBACK_ICE = [
-  { urls: 'stun:stun.l.google.com:19302' },
+  STUN,
   { urls: 'stun:global.stun.twilio.com:3478' },
   { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
 ];
 
-const ICE_SERVERS = MY_TURN.length
-  ? [{ urls: 'stun:stun.l.google.com:19302' }, ...MY_TURN]
-  : FALLBACK_ICE;
+export const USING_CUSTOM_TURN = !!(METERED_APP && METERED_API_KEY);
 
-export const USING_CUSTOM_TURN = MY_TURN.length > 0;
-
-const PEER_OPTS = { debug: 1, config: { iceServers: ICE_SERVERS } };
+// ICE-серверы загружаем один раз. С ключом — свежие доступы из Metered.
+let _icePromise = null;
+function loadIce() {
+  if (_icePromise) return _icePromise;
+  if (USING_CUSTOM_TURN) {
+    const url = `https://${METERED_APP}.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(METERED_API_KEY)}`;
+    _icePromise = fetch(url)
+      .then((r) => { if (!r.ok) throw new Error('TURN HTTP ' + r.status); return r.json(); })
+      .then((list) => (Array.isArray(list) && list.length ? [STUN, ...list] : FALLBACK_ICE))
+      .catch((e) => { console.warn('Не удалось получить TURN от Metered:', e); return FALLBACK_ICE; });
+  } else {
+    _icePromise = Promise.resolve(FALLBACK_ICE);
+  }
+  return _icePromise;
+}
 
 function randomCode(len = 5) {
   let s = '';
@@ -66,9 +73,9 @@ export class Net {
 
   on(event, fn) { this.handlers[event] = fn; return this; }
 
-  _newPeer(id) {
+  _newPeer(id, ice) {
     // eslint-disable-next-line no-undef
-    return new Peer(id, PEER_OPTS);
+    return new Peer(id, { debug: 1, config: { iceServers: ice } });
   }
 
   _bindPeerCommon(peer) {
@@ -82,10 +89,15 @@ export class Net {
 
   host() {
     this.isHost = true;
+    this.handlers.status('Подготовка соединения…');
+    loadIce().then((ice) => this._startHost(ice));
+  }
+
+  _startHost(ice) {
     let attempts = 0;
     const tryHost = () => {
       this.code = randomCode();
-      const peer = this._newPeer(PREFIX + this.code);
+      const peer = this._newPeer(PREFIX + this.code, ice);
       this.peer = peer;
       this._bindPeerCommon(peer);
       peer.on('open', () => this.handlers.open(this.code));
@@ -111,7 +123,12 @@ export class Net {
   join(code) {
     this.isHost = false;
     this.code = String(code).trim().toUpperCase();
-    const peer = this._newPeer(undefined);
+    this.handlers.status('Подготовка соединения…');
+    loadIce().then((ice) => this._startJoin(ice));
+  }
+
+  _startJoin(ice) {
+    const peer = this._newPeer(undefined, ice);
     this.peer = peer;
     this._bindPeerCommon(peer);
     peer.on('open', () => {
