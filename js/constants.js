@@ -13,8 +13,8 @@ export const BOARD_SIZE = 5;
 export const CELLS = BOARD_SIZE * BOARD_SIZE; // 25
 
 export const PERSONAL_PER_PLAYER = 4;
-export const COMMON_COUNT = 14;
-export const COMMON_REROLL_MAX = 7; // до половины общих костей
+export const COMMON_COUNT = 15;
+export const COMMON_REROLL_MAX = 7; // до половины общих костей (floor(15/2))
 
 export const TOTAL_ROUNDS = 3;
 

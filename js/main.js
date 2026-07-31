@@ -1,9 +1,10 @@
 // Точка входа: лобби, соединение, связка сети и игры.
 // Хост авторитетен (seat 0), гость (seat 1) только рисует и шлёт действия.
 
-import { createGame, apply, viewFor } from './game.js?v=7';
-import { Net } from './net.js?v=7';
-import * as ui from './ui.js?v=7';
+import { createGame, apply, viewFor } from './game.js?v=8';
+import { Net } from './net.js?v=8';
+import * as ui from './ui.js?v=8';
+import * as audio from './audio.js?v=8';
 
 const net = new Net();
 let role = null;       // 'host' | 'guest'
@@ -13,8 +14,13 @@ let lastPhase = null;
 const $ = (id) => document.getElementById(id);
 
 // ---------- экраны ----------
+let helpShownOnce = false;
 function showLobby() { $('lobby').classList.remove('hidden'); $('game').classList.add('hidden'); }
-function showGame() { $('lobby').classList.add('hidden'); $('game').classList.remove('hidden'); }
+function showGame() {
+  $('lobby').classList.add('hidden');
+  $('game').classList.remove('hidden');
+  if (!helpShownOnce) { helpShownOnce = true; $('help-modal').classList.remove('hidden'); }
+}
 
 // ---------- баннер первого игрока при входе в раунд общих костей ----------
 function handleBanner(state) {
@@ -115,4 +121,21 @@ window.addEventListener('DOMContentLoaded', () => {
   $('join-code').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') $('btn-join-go').click();
   });
+
+  // звук леса
+  const soundBtn = $('btn-sound');
+  soundBtn.addEventListener('click', () => {
+    const on = audio.toggle();
+    soundBtn.textContent = on ? '🔊' : '🔈';
+    soundBtn.title = on ? 'Выключить звук леса' : 'Включить звук леса';
+  });
+
+  // справка
+  const helpModal = $('help-modal');
+  const openHelp = () => helpModal.classList.remove('hidden');
+  const closeHelp = () => helpModal.classList.add('hidden');
+  $('btn-help').addEventListener('click', openHelp);
+  $('btn-help-close').addEventListener('click', closeHelp);
+  helpModal.addEventListener('click', (e) => { if (e.target === helpModal) closeHelp(); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeHelp(); });
 });

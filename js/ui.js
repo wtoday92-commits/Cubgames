@@ -1,7 +1,7 @@
 // Рендер и ввод. Рисует состояние с точки зрения mySeat.
 // Своё всегда синим, соперник — красным.
 
-import { FACE_HEX, FACE_LABEL_RU, BOARD_SIZE, CELLS, POINTS_BY_LENGTH } from './constants.js?v=7';
+import { FACE_HEX, FACE_LABEL_RU, BOARD_SIZE, CELLS, POINTS_BY_LENGTH } from './constants.js?v=8';
 
 const other = (s) => (s === 0 ? 1 : 0);
 
@@ -91,13 +91,14 @@ export function render(state) {
   const right = document.createElement('div');
   right.className = 'right';
   right.appendChild(statusBar(state));
+  right.appendChild(callout(state));
+  right.appendChild(legend());
   right.appendChild(playerPanel(state, other(mySeat), true));
   right.appendChild(playerPanel(state, mySeat, false));
   if (state.phase === 'commonRoll' || state.phase === 'placeCommon') {
     right.appendChild(commonPool(state));
   }
   right.appendChild(controls(state));
-  right.appendChild(instructions(state));
   right.appendChild(historyPanel(state));
 
   layout.appendChild(left);
@@ -315,6 +316,47 @@ function gameOver(state) {
   d.className = 'game-over';
   let verdict = my > op ? '🏆 Вы победили!' : (my < op ? 'Вы проиграли' : 'Ничья');
   d.innerHTML = `<div class="verdict">${verdict}</div><div>Итог: <b class="mine">${my}</b> : <b class="opp">${op}</b></div>`;
+  return d;
+}
+
+function callout(state) {
+  const box = document.createElement('div');
+  box.className = 'callout';
+  const myTurn = state.turn === mySeat;
+  let cls = 'turn-mine', badge = '', text = '', step = '';
+
+  if (state.phase === 'personalRoll') {
+    if (state.readyPersonal[mySeat]) { badge = 'Ожидание'; text = 'Вы готовы. Ждём соперника — он тоже кидает свои кости.'; }
+    else { badge = 'Ваш бросок'; text = 'Бросьте свои 4 личные кости.'; step = 'Кликните кости, которые хотите перебросить (один раз), и нажмите «Перебросить», либо сразу «Готов».'; }
+  } else if (state.phase === 'commonRoll') {
+    if (state.commonTurn === mySeat) { badge = 'Ваш ход'; text = 'Можно перебросить общие кости.'; step = 'Отметьте до 7 костей и нажмите «Перебросить», либо «Готов».'; }
+    else { cls = 'turn-opp'; badge = 'Ход соперника'; text = 'Соперник перебрасывает общие кости…'; }
+  } else if (state.phase === 'placeCommon') {
+    if (myTurn) { badge = 'Ваш ход'; text = 'Поставьте общую кость на поле.'; step = 'Выберите кость в блоке «Общие кости», затем кликните пустую (мерцающую) клетку. Пока идёт расстановка общих — комбинации ещё не считаются.'; }
+    else { cls = 'turn-opp'; badge = 'Ход соперника'; text = 'Соперник ставит общую кость…'; }
+  } else if (state.phase === 'placePersonal') {
+    if (myTurn) { badge = 'Ваш ход'; text = 'Поставьте свою личную кость.'; step = '3+ одного цвета подряд в ряду/столбце, куда вы поставили последним, — ваша комбинация (синяя). Можно перетянуть чужую, добавив свою кость.'; }
+    else { cls = 'turn-opp'; badge = 'Ход соперника'; text = 'Соперник ставит личную кость…'; }
+  } else if (state.phase === 'scoring') {
+    badge = 'Итог раунда'; text = 'Раунд посчитан. Синие комбинации — ваши, красные — соперника.'; step = 'Нажмите «Следующий раунд».';
+  } else if (state.phase === 'gameover') {
+    badge = 'Игра окончена'; text = 'Смотрите итог ниже.';
+  }
+
+  box.classList.add(cls);
+  box.innerHTML = `<span class="cta-badge">${badge}</span><div class="cta-text">${text}</div>` +
+    (step ? `<div class="cta-step">${step}</div>` : '');
+  return box;
+}
+
+function legend() {
+  const d = document.createElement('div');
+  d.className = 'legend';
+  d.innerHTML =
+    '<span><i class="dot ring-mine"></i>ваши</span>' +
+    '<span><i class="dot ring-opp"></i>соперника</span>' +
+    '<span><i class="dot" style="background:#e2a53a"></i>★ джокер — любой цвет</span>' +
+    '<span><i class="dot" style="background:#f2f2f2;box-shadow:0 0 0 1px #999"></i>белый — никакой</span>';
   return d;
 }
 
